@@ -1,0 +1,2 @@
+#!/bin/bash
+python3 /home/tso/Downloads/stuff/ignition/testing_area/jawf.py $1 $2 $3
