@@ -45,7 +45,7 @@ def db_attach(server):
     col = server.data_col
     # Example 
     # db.create_table(
-    #    'users', 
+    #    'users', # 
     #     [
     #        col('userid', int, 'AUTOINCREMENT'),
     #        col('username', str, 'UNIQUE NOT NULL'),
@@ -53,11 +53,17 @@ def db_attach(server):
     #        col('join_date', str, None),
     #        col('last_login', str, None),
     #     ],
-    # 'userid'
+    # 'userid' # Primary Key
     # )
+    #UNCOMMENT Below to create
+    #
+    #db.create_table(
+    #   '{table}', col(), col(), col()
+    #)
     pass # Enter db.create_table statement here
             """.format(
-                name=db
+                name=db,
+                table=table_name
             ))
         with open(proj_dir + 'dbs/%s/setup.py'%(db), 'a') as stp:
             toWrite = [
@@ -67,7 +73,7 @@ def db_attach(server):
             for l in toWrite:
                 stp.write(l)
         
-def add_db(name):
+def add_db(name, db_type='sqlite'):
     """
         db to create within existing jawf project dir
     """
@@ -97,15 +103,23 @@ def add_db(name):
             initpy.write('# created for db %s'%(name))
         with open(proj_dir + 'dbs/'+name.lower()+'/.cmddir', 'w') as c:
             c.write(proj_dir)
+        connector = 'mysql.connector' if db_type == 'mysql' else 'sqlite'
         with open(proj_dir + 'dbs/%s/'%(name.lower())+'%s_db.py'%(name), 'w') as newdb:
             toWrite=[
             "def run(server):\n",
             "    import sys, os\n",
-            "    sys.path.append('/home/tso/Downloads/stuff/ignition/pyql/')\n",
-            '    import data,sqlite3\n',
+            "    config={}\n"
+            "    config['user'] = os.getenv('DB_USER')\n",
+            "    config['password'] = os.getenv('DB_PASSWORD')\n",
+            "    config['database'] = os.getenv('DB_NAME')\n",
+            "    config['host'] = os.getenv('DB_HOST')\n",
+            "    sys.path.append('/pyql/')\n",
+            '    import data, {db_type}\n'.format(db_type=db_type),
             '    from . import setup\n',
-            "    path = os.path.dirname(setup.__file__) + '/'\n",
-            "    server.data['{name}'] = data.database(sqlite3.connect, path + '{name}_db')\n".format(name=name),
+            "    server.data['{name}'] = data.database({connector}.connect, **config)\n".format(
+                    name=name,
+                    connector=connector
+                ),
             '    server.data_col = data.col\n',
             '    setup.attach_tables(server)\n'
             ]
@@ -236,7 +250,8 @@ if __name__ == "__main__":
                 if arg2 == 'add':
                     if check_for_project():
                         print("adding db {name}".format(name=arg3))
-                        add_db(arg3)
+                        db_type ='sqlite' if len(sys.argv) < 5 else sys.argv[4]
+                        add_db(arg3, db_type)
                     else:
                         print ("Error: \n" +
                             "   add db must be used within an existing project directory or \n" +
