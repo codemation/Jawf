@@ -45,20 +45,23 @@ def db_attach(server):
     col = server.data_col
     # Example 
     # db.create_table(
-    #    'users', # 
+    #    'users', # table-name
     #     [
-    #        col('userid', int, 'AUTOINCREMENT'),
-    #        col('username', str, 'UNIQUE NOT NULL'),
-    #        col('email', str, 'NOT NULL'),
-    #        col('join_date', str, None),
-    #        col('last_login', str, None),
+    #        ('userid', int, 'AUTOINCREMENT'),
+    #        ('username', str, 'UNIQUE NOT NULL'),
+    #        ('email', str, 'NOT NULL'),
+    #        ('join_date', str),
+    #        ('last_login', str),
     #     ],
     # 'userid' # Primary Key
     # )
     #UNCOMMENT Below to create
     #
     #db.create_table(
-    #   '{table}', col(), col(), col()
+    #    '{table}', [
+    #        (), 
+    #        (), 
+    #        ()
     #)
     pass # Enter db.create_table statement here
             """.format(
@@ -108,11 +111,15 @@ def add_db(name, db_type='sqlite'):
             toWrite=[
             "def run(server):\n",
             "    import sys, os\n",
-            "    config={}\n"
-            "    config['user'] = os.getenv('DB_USER')\n",
-            "    config['password'] = os.getenv('DB_PASSWORD')\n",
-            "    config['database'] = os.getenv('DB_NAME')\n",
-            "    config['host'] = os.getenv('DB_HOST')\n",
+            "    config={}\n",
+            "    env = ['DB_USER','DB_PASSWORD','DB_HOST', 'DB_PORT']\n",
+            "    conf = ['user','password','database','host','port']\n",
+            "    try:\n"
+            "        config = {cnfVal: os.getenv(dbVal).rstrip() for dbVal,cnfVal in zip(env,conf)}\n",
+            "    except Exception as e:\n",
+            "        print('Missing an environment variable')\n",
+            "        print({cnfVal: os.getenv(dbVal).rstrip() for dbVal,cnfVal in zip(env,conf)})\n",
+            "    #PATH for PYQL library\n",
             "    sys.path.append('/pyql/')\n",
             '    import data, {db_type}\n'.format(db_type=db_type),
             '    from . import setup\n',
@@ -120,7 +127,6 @@ def add_db(name, db_type='sqlite'):
                     name=name,
                     connector=connector
                 ),
-            '    server.data_col = data.col\n',
             '    setup.attach_tables(server)\n'
             ]
             for l in toWrite:
@@ -221,7 +227,12 @@ def init(name):
 if __name__ == "__main__":
     import sys
     if len (sys.argv) < 3:
-        print ("jawf takes at least 2 argument: \n Example: \n  jawf.py init Project1")
+        print ("""
+jawf takes at least 2 argument:
+
+    Example:    
+    jawf.py init Project1
+            """)
     else:
         print (sys.argv)
         arg1,arg2 = sys.argv[1], sys.argv[2] 
