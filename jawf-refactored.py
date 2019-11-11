@@ -39,7 +39,7 @@ def add_db_table(db, tableName):
     except:
         # create schema file to declare columns 
         try:
-            with open(f'{proj_dir}dbs/{db}/tables/{tableName}.py', 'w') as tbl:
+            with open(f'{proj_dir}dbs/{db.lower()}/tables/{tableName}.py', 'w') as tbl:
                 tbl.write(f"""
 def db_attach(server):
     db = server.data['{db}']
@@ -66,10 +66,10 @@ def db_attach(server):
     pass # Enter db.create_table statement here
             """)
         except FileNotFoundError:
-            print(f'Error when creating file {proj_dir}dbs/{db}/tables/{tableName}.py')
+            print(f'Error when creating file {proj_dir}dbs/{db.lower()}/tables/{tableName}.py')
             print(f'db {db} directory may have moved or does not exist, was DB ever created?')
             return
-        with open(f'{proj_dir}dbs/{db}/setup.py', 'a') as setup:
+        with open(f'{proj_dir}dbs/{db.lower()}/setup.py', 'a') as setup:
             setup.write(f"""
     from dbs.{db}.tables import {tableName}
     {tableName}.db_attach(server)
@@ -84,6 +84,7 @@ def add_db(dbName, dbType='sqlite3'):
     proj_dir = get_proj_dir('add_db')
 
     try:
+        # Make sure DB does not exist already with same name
         with open(f'{proj_dir}dbs/{dbName}/__init__.py', 'r') as initpy:
             print (f"DB with name {dbName} already exists")
     except:
@@ -97,9 +98,9 @@ def add_db(dbName, dbType='sqlite3'):
         os.makedirs(f'{proj_dir}dbs/{dbName.lower()}')
         #Make tables dir within db dir
         os.makedirs(f'{proj_dir}dbs/{dbName.lower()}/tables')
-        with open(f'{proj_dir}dbs/{dbName}/tables/.cmddir', 'a') as c:
+        with open(f'{proj_dir}dbs/{dbName.lower()}/tables/.cmddir', 'a') as c:
             c.write(proj_dir)
-        with open(f'{proj_dir}dbs/{dbName}/tables/.jawf_db', 'a') as j:
+        with open(f'{proj_dir}dbs/{dbName.lower()}/tables/.jawf_db', 'a') as j:
             j.write(dbName)
 
         # make __init__.py & app.py
@@ -112,40 +113,51 @@ def add_db(dbName, dbType='sqlite3'):
             newdb.write(f"""# {dbName} - type {dbType}
 def run(server):
     import sys, os
-    config=dict()
+    @server.route('/{dbName.lower()}_attach')
+    def {dbName.lower()}_attach():
+        config=dict()
             """)
             if dbType == 'mysql':
-                newdb(f"""
-    env = ['DB_USER','DB_PASSWORD','DB_HOST', 'DB_PORT']
-    conf = ['user','password','database','host','port']
-    try:
-        config = {'{cnfVal: os.getenv(dbVal).rstrip() for dbVal,cnfVal in zip(env,conf)}'}
-    except Exception as e:
-        print('Missing an environment variable')
-        config= {'{cnfVal: os.getenv(dbVal) for dbVal,cnfVal in zip(env,conf)}'}
-        print(config)""")
+                newdb.write(f"""
+        env = ['DB_USER','DB_PASSWORD','DB_HOST', 'DB_PORT', DB_NAME]
+        conf = ['user','password','host','port', database]
+        try:
+            config = {'{cnfVal: os.getenv(dbVal).rstrip() for dbVal,cnfVal in zip(env,conf)}'}
+        except Exception as e:
+            print('Missing an environment variable')
+            config= {'{cnfVal: os.getenv(dbVal) for dbVal,cnfVal in zip(env,conf)}'}
+            print(config)
+            return {'{'}
+                "status": 500, 
+                "message": "Missing environment variable(s)",
+                "env-vars": config
+            {'}'}, 500 """)
             elif dbType=='sqlite3':
                 newdb.write(f"""
-    config['database'] = '{dbName}'""")
+        with open('.cmddir', 'r') as projDir:
+            for projectPath in projDir:
+                config['database'] = f'{'{projectPath}'}dbs/{dbName.lower()}/{dbName}'""")
             else:
                 print(f"un-support type {dbType} provided with --type . Use: mysql or sqlite3")
                 return
             newdb.write(f"""
-    #USE ENV PATH for PYQL library or /pyql/
-    sys.path.append('/pyql/' if os.getenv('PYQL_PATH') == None else os.getenv('PYQL_PATH'))
-
-    import data, {dbType}
-    from . import setup
-    server.data['{dbName}'] = data.database({connector}.connect, **config)
-    setup.attach_tables(server)
+        #USE ENV PATH for PYQL library or /pyql/
+        sys.path.append('/pyql/' if os.getenv('PYQL_PATH') == None else os.getenv('PYQL_PATH'))
+        try:
+            import data, {dbType}
+            from . import setup
+            server.data['{dbName}'] = data.database({connector}.connect, **config)
+            setup.attach_tables(server)
+            return {'{"status": 200, "message": '}"{dbName} attached successfully"{'}'}, 200
+        except Exception as e:
+            return {'{"status": 200, "message": '}repr(e){'}'}, 500
+    {dbName.lower()}_attach()
             """)
-        with open(f'{proj_dir}dbs/{dbName}/setup.py', 'w') as db_setup:
+        with open(f'{proj_dir}dbs/{dbName.lower()}/setup.py', 'w') as db_setup:
             db_setup.write(f""" # {dbName}
 def attach_tables(server):
     #Tables are added  here
-    pass
-            """)
-        #
+    pass""")
         print(f"db {dbName} created successfully ")
         
 def add_app(appName, route=None):
